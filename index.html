@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>myFullSwipter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        .swiper-wrapper {
+            position: relative;
+            height: 360px;
+            overflow: hidden;
+        }
+
+        .swiper-list {
+            position: relative;
+            display: flex;
+            height: 100%;
+        }
+
+        .swiper-item {
+            width: 100%;
+            flex: none;
+        }
+
+        .swiper-pagination {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .swiper-pagination-switch {
+            display: inline-block;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background-color: #f2efe6;
+            cursor: pointer;
+        }
+
+        .swiper-pagination-switch.active {
+            background-color: #E03636;
+        }
+
+        .swiper-arrow {
+            position: absolute;
+            width: 50px;
+            height: 80px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #EDD0BE;
+            line-height: 80px;
+            text-align: center;
+            color: #666;
+            cursor: pointer;
+            opacity: 0;
+            transition: all .2s ease;
+        }
+
+        .swiper-arrow-left {
+            left: 100px;
+        }
+
+        .swiper-arrow-right {
+            right: 100px;
+        }
+
+        .swiper-wrapper:hover .swiper-arrow {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="swiper-wrapper" id="swiper-wrapper">
+
+        <div class="swiper-list" id="swiper-list">
+            <div class="swiper-item" style="background-color: #82A6F5;">1</div>
+            <div class="swiper-item" style="background-color: #EAF048;">2</div>
+            <div class="swiper-item" style="background-color: #9FF048;">3</div>
+            <div class="swiper-item" style="background-color: #2A5200;">4</div>
+            <div class="swiper-item" style="background-color: #F6D6FF;">5</div>
+        </div>
+
+        <div class="swiper-pagination">
+            <span class="swiper-pagination-switch active"></span>
+            <span class="swiper-pagination-switch"></span>
+            <span class="swiper-pagination-switch"></span>
+            <span class="swiper-pagination-switch"></span>
+            <span class="swiper-pagination-switch"></span>
+        </div>
+
+        <a class="swiper-arrow swiper-arrow-left" id="swiper-prev">&lt;</a>
+        <a class="swiper-arrow swiper-arrow-right" id="swiper-next">&gt;</a>
+    </div>
+
+    <script>
+        //1.创建单例对象
+        const PAGE = {
+            //1.1定义 PAGE.data 需要存放的数据
+            data: {
+                index: 0, //当前第几个
+                duration: 500, //滑动时长
+                isLock: false, //锁
+                translateX: 0, //偏移量
+                defaultLength: null, //默认的项目数量
+                itemWidth: null //单个项目的长度
+            },
+
+            //1.2 创建 init 、bind 方法，并在 init 中调用 bind
+            init: function () {
+                this.clone();
+                this.bind();
+            },
+
+            bind: function () {
+                //4.绑定上一项滑动事件 4.1获取上一项元素 swiper-prev 并绑定 swpierPrev事件 在点击时触发
+                let swiperPrev = document.getElementById('swiper-prev');
+                swiperPrev.addEventListener('click', this.swiperPrev);
+
+                //5.绑定下一项滑动事件 5.1获取下一项元素 swiper-next 并绑定 swpierNext 在点击时触发
+                let swiperNext = document.getElementById('swiper-next');
+                swiperNext.addEventListener('click', this.swiperNext);
+
+                //7.标签切换与高亮 7.1获取所有 swiper-pagination-switch 元素
+                let swiperSwitch = document.getElementsByClassName('swiper-pagination-switch');
+                //7.2循环为其添加 data-index 属性并绑定 swiperSwitch 事件
+                for (let i = 0; i < swiperSwitch.length; i++) {
+                    swiperSwitch[i].dataset.index = i;
+                    swiperSwitch[i].addEventListener('click', this.swiperSwitch)
+                }
+
+                //9.监听浏览器窗口变化 9.1在 bind 中绑定浏览器 resize 变化事件 swiperReset
+                window.addEventListener('resize', this.swiperReset)
+            },
+
+
+            //2.克隆项目 2.1创建 PAGE.clone 克隆项目方法
+            clone: function () {
+                //2.2获取 swiper-item 元素，并克隆第一项和最后一项
+                let swiperItem = document.getElementsByClassName('swiper-item');
+                let firstItem = swiperItem[0].cloneNode();
+                let lastItem = swiperItem[swiperItem.length - 1].cloneNode();
+
+                //2.3更新 PAGE.data 中 defaultLenght 、itemWidth、translateX 的值。
+                let swiperList = document.getElementById('swiper-list');
+                let index = PAGE.data.index;
+                let swiperItemWidth = swiperList.offsetWidth;
+                PAGE.data.defaultLength = swiperItem.length;
+                PAGE.data.itemWidth = swiperItemWidth;
+                PAGE.data.translateX = -(swiperItemWidth + swiperItemWidth * index);
+
+                //2.4把克隆的第一项放到 swiper-list 的最后，把克隆的最后一项放在 swiper-list 的第一位
+                swiperList.appendChild(firstItem);
+                swiperList.prepend(lastItem);
+
+                //3.滑动到显示位置  3.3在 PAGE.clone 方法完毕后调用 Page.goIndex 并传入 PAGE.data.index 默认索引
+                PAGE.goIndex(index);
+            },
+
+            //3.滑动到显示位置  3.2创建滑动函数 Page.goIndex，接收一个参数，为滑动到第几项
+            goIndex: function (index) {
+                //3.2.1在 PAGE.data 中获取动画时间长、项目宽度、偏移量（ duration、itemWidth、translateX ）
+                let swiperDuration = PAGE.data.duration;
+                let swiperItemWidth = PAGE.data.itemWidth;
+                let beginTranslateX = PAGE.data.translateX;
+                //3.2.2根据传入的 index 计算出滑动结束的目标位置
+                let endTranslateX = -(swiperItemWidth + swiperItemWidth * index);
+
+                //6.加锁与解锁  6.1在 goIndex 事件中，调用动画之前获取 PAGE.data.isLock 判断
+                let isLock = PAGE.data.isLock;
+                //6.2 如果已经锁了，就直接返回，不进行滑动事件的触发，如果没锁，把锁锁上
+                if (isLock) return;
+                PAGE.data.isLock = true;
+
+                //3.2.3调用 PAGE.animateTo 动画，在滑动过程渲染回调中设置 swiper-list 的偏移值
+                let swiperList = document.getElementById('swiper-list');
+                PAGE.animateTo(beginTranslateX, endTranslateX, swiperDuration, function (value) {
+                    //3.2.4在滑动过程回调中，设置 swiper-list 的偏移值
+                    swiperList.style.transform = `translateX(${value}px)`;
+                }, function (value) {
+
+                    //8.位置重置 8.1在动画回调完成时候，获取默认的项目长度
+                    let swiperLength = PAGE.data.defaultLength;
+                    //8.2如果当前索引为 -1 时，也是就滑动到我们 clone 的最后一项, 重设索引为最后一项，并重新计算偏移量
+                    if (index == -1) {
+                        index = swiperLength - 1;
+                        value = - (swiperItemWidth + swiperItemWidth * index);
+                    }
+                    //8.3如果当前索引为项目长度，也就是滑动到我们 clone 的第一项,重设索引为第 0 项目，并重新计算偏移量
+                    if (index == swiperLength) {
+                        index = 0;
+                        value = - (swiperItemWidth + swiperItemWidth * index);
+                    }
+
+                    //3.2.5在滑动完毕的回调中，设置借结束位置及更新 PAGE.data 中的当前显示索引以及当前偏移量
+                    swiperList.style.transform = `translateX(${value}px)`;
+                    PAGE.data.index = index;
+                    PAGE.data.translateX = value;
+
+                    //6.加锁与解锁 6.3在滑动动画完成的回调中，解锁
+                    PAGE.data.isLock = false;
+
+                    //7.标签切换与高亮 7.5在 goIndex 滑动结束的回调中调用
+                    PAGE.hightLight(index);
+                })
+            },
+
+            //3.滑动到显示位置 3.1创建 Page.animateTo 动画函数和 linear 匀速函数
+            animateTo: function (begin, end, duration, changeCallback, finishCallback) {
+                // 动画开始的时间
+                let startTime = Date.now();
+                //针频动画
+                requestAnimationFrame(function update() {
+                    //当前执行的时间
+                    let dateNow = Date.now();
+                    // 当前所消耗的时间
+                    let time = dateNow - startTime;
+                    //当前发生的位移
+                    let value = PAGE.linear(time, begin, end, duration);
+                    // 执行变化事件回调
+                    typeof changeCallback == 'function' && changeCallback(value);
+                    // 如果动画结束时间大于当前执行时间，再执行一次动画渲染，否则执行结束回调
+                    if (startTime + duration > dateNow) {
+                        requestAnimationFrame(update);
+                    }
+                    else {
+                        typeof finishCallback === 'function' && finishCallback(end);
+                    }
+                })
+            },
+
+            linear: function (time, begin, end, duration) {
+                /* 
+                 * time     当前时间
+                 * begin    开始位移
+                 * end      结束位移
+                 * duration 全程时间
+                */
+                //返回：当前位移
+                return (end - begin) * time / duration + begin;
+            },
+
+            //4.绑定上一项滑动事件 4.2创建 swpierPrev 事件
+            swiperPrev: function () {
+                //获取 PAGE.data 中的当前索引值 index
+                let index = PAGE.data.index;
+                //调用 PAGE.goIndex 并传入 index - 1
+                PAGE.goIndex(index - 1);
+            },
+
+            //5.绑定下一项滑动事件 5.2创建 swpierNext 事件
+            swiperNext: function () {
+                //获取 PAGE.data 中的当前索引值 index
+                let index = PAGE.data.index;
+                //调用 PAGE.goIndex 并传入 index + 1
+                PAGE.goIndex(index + 1);
+            },
+
+            //7.标签切换与高亮 7.3新建 swiperSwitch 事件
+            swiperSwitch: function (e) {
+                //获取当前点击元素的 dataset 中 index 的值，为对应的索引
+                let index = e.target.dataset.index;
+                //调用 goIndex 并传入 index
+                index = Number(index);
+                PAGE.goIndex(index);
+            },
+
+            //7.4 新建 hightlight 标签高亮方法，接收第几项高亮的索引 index
+            hightLight: function (index) {
+                //去除所有 swiper-pagination-switch 的高亮
+                let swiperSwitch = document.getElementsByClassName('swiper-pagination-switch');
+                for (let i = 0; i < swiperSwitch.length; i++) {
+                    swiperSwitch[i].className = 'swiper-pagination-switch';
+                }
+                //为索引下的 swiper-pagination-switch 添加高亮
+                swiperSwitch[index].className = 'swiper-pagination-switch active';
+            },
+
+            //9.监听浏览器窗口变化 9.2 创建 swiperReset 事件
+            swiperReset: function () {
+                //获取 swiper-list 变化后的宽度和当前所在索引
+                let swiperList = document.getElementById('swiper-list');
+                let swiperItemWidth = swiperList.offsetWidth;
+                let index = PAGE.data.index;
+                //计算变化后的偏移量
+                let translateX = -(swiperItemWidth + swiperItemWidth * index);
+                //重设 PAGE.data 中的偏移量和宽度
+                PAGE.data.itemWidth = swiperItemWidth;
+                PAGE.data.translateX = translateX;
+                //设置页面的偏移量
+                swiperList.style.transform = `translateX(${translateX}px)`;
+            },
+        }
+
+        PAGE.init();
+    </script>
+</body>
+
+</html>
